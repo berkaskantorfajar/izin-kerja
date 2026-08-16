@@ -45,7 +45,37 @@ const MAIL_FROM_NAME =
 // STATIC FILE
 // ======================================================
 
-app.use(express.static(__dirname));
+const PUBLIC_DIR = process.cwd();
+
+app.use(
+  express.static(PUBLIC_DIR, {
+    index: false,
+    fallthrough: true
+  })
+);
+
+// Pastikan file JavaScript dikirim sebagai JavaScript
+app.get("/app.js", (req, res) => {
+  res.type("application/javascript");
+  res.sendFile(
+    path.join(PUBLIC_DIR, "app.js")
+  );
+});
+
+// Pastikan CSS dikirim sebagai CSS
+app.get("/style.css", (req, res) => {
+  res.type("text/css");
+  res.sendFile(
+    path.join(PUBLIC_DIR, "style.css")
+  );
+});
+
+// Halaman utama
+app.get("/", (req, res) => {
+  res.sendFile(
+    path.join(PUBLIC_DIR, "index.html")
+  );
+});
 
 // ======================================================
 // SESSION
@@ -771,21 +801,6 @@ app.post(
 );
 
 // ======================================================
-// HALAMAN UTAMA
-// ======================================================
-
-app.get("/", (req, res) => {
-
-  res.sendFile(
-    path.join(
-      __dirname,
-      "index.html"
-    )
-  );
-
-});
-
-// ======================================================
 // API 404
 // ======================================================
 
@@ -816,18 +831,17 @@ app.use(
 // FALLBACK
 // ======================================================
 
-app.use(
-  (req, res) => {
+app.use((req, res) => {
 
-    res.sendFile(
-      path.join(
-        __dirname,
-        "index.html"
-      )
-    );
-
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({
+      ok: false,
+      message: "API endpoint tidak ditemukan."
+    });
   }
-);
+
+  res.status(404).send("Halaman tidak ditemukan.");
+});
 
 // ======================================================
 // LOCAL SERVER
