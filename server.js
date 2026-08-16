@@ -7,30 +7,45 @@ const path = require("path");
 
 const app = express();
 
+// ======================================================
+// MIDDLEWARE
+// ======================================================
+
 app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: "25mb"
+}));
 
 // ======================================================
 // KONFIGURASI
 // ======================================================
 
-const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "admin123";
+const ADMIN_USER =
+  process.env.ADMIN_USER || "admin";
+
+const ADMIN_PASS =
+  process.env.ADMIN_PASS || "admin123";
 
 const SESSION_SECRET =
-  process.env.SESSION_SECRET || "izin-kerja-secret-2026";
+  process.env.SESSION_SECRET ||
+  "izin-kerja-secret-2026";
 
 const MAIL_TO =
-  process.env.MAIL_TO || "stasiungombong2026@gmail.com";
+  process.env.MAIL_TO ||
+  "stasiungombong2026@gmail.com";
 
 const SMTP_HOST =
-  process.env.SMTP_HOST || "smtp.gmail.com";
+  process.env.SMTP_HOST ||
+  "smtp.gmail.com";
 
 const SMTP_PORT =
   Number(process.env.SMTP_PORT || 465);
 
 const SMTP_SECURE =
-  String(process.env.SMTP_SECURE || "true").toLowerCase() === "true";
+  String(
+    process.env.SMTP_SECURE || "true"
+  ).toLowerCase() === "true";
 
 const SMTP_USER =
   process.env.SMTP_USER || "";
@@ -39,43 +54,14 @@ const SMTP_PASS =
   process.env.SMTP_PASS || "";
 
 const MAIL_FROM_NAME =
-  process.env.MAIL_FROM_NAME || "Form Izin Kerja";
+  process.env.MAIL_FROM_NAME ||
+  "Form Izin Kerja";
 
 // ======================================================
 // STATIC FILE
 // ======================================================
 
-const PUBLIC_DIR = process.cwd();
-
-app.use(
-  express.static(PUBLIC_DIR, {
-    index: false,
-    fallthrough: true
-  })
-);
-
-// Pastikan file JavaScript dikirim sebagai JavaScript
-app.get("/app.js", (req, res) => {
-  res.type("application/javascript");
-  res.sendFile(
-    path.join(PUBLIC_DIR, "app.js")
-  );
-});
-
-// Pastikan CSS dikirim sebagai CSS
-app.get("/style.css", (req, res) => {
-  res.type("text/css");
-  res.sendFile(
-    path.join(PUBLIC_DIR, "style.css")
-  );
-});
-
-// Halaman utama
-app.get("/", (req, res) => {
-  res.sendFile(
-    path.join(PUBLIC_DIR, "index.html")
-  );
-});
+app.use(express.static(__dirname));
 
 // ======================================================
 // SESSION
@@ -83,56 +69,88 @@ app.get("/", (req, res) => {
 
 function createSignature(payload) {
   return crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac(
+      "sha256",
+      SESSION_SECRET
+    )
     .update(payload)
     .digest("hex");
 }
 
 function createSession() {
-  const payload = Buffer.from(
-    JSON.stringify({
-      username: ADMIN_USER,
-      exp: Date.now() + 8 * 60 * 60 * 1000
-    })
-  ).toString("base64url");
 
-  return payload + "." + createSignature(payload);
+  const payload =
+    Buffer.from(
+      JSON.stringify({
+        username: ADMIN_USER,
+        exp:
+          Date.now() +
+          8 * 60 * 60 * 1000
+      })
+    ).toString("base64url");
+
+  return (
+    payload +
+    "." +
+    createSignature(payload)
+  );
 }
 
 function getCookie(req, name) {
-  const cookies = String(req.headers.cookie || "")
-    .split(";")
-    .map(v => v.trim());
 
-  const item = cookies.find(v =>
-    v.startsWith(name + "=")
+  const cookies =
+    String(req.headers.cookie || "")
+      .split(";")
+      .map(v => v.trim());
+
+  const item =
+    cookies.find(v =>
+      v.startsWith(name + "=")
+    );
+
+  if (!item) {
+    return null;
+  }
+
+  return item.substring(
+    name.length + 1
   );
-
-  if (!item) return null;
-
-  return item.substring(name.length + 1);
 }
 
 function checkSession(req) {
-  const token = getCookie(req, "ik_session");
+
+  const token =
+    getCookie(
+      req,
+      "ik_session"
+    );
 
   if (!token) {
     return false;
   }
 
   try {
-    const parts = token.split(".");
+
+    const parts =
+      token.split(".");
 
     if (parts.length !== 2) {
       return false;
     }
 
-    const payload = parts[0];
-    const signature = parts[1];
+    const payload =
+      parts[0];
 
-    const expected = createSignature(payload);
+    const signature =
+      parts[1];
 
-    if (signature.length !== expected.length) {
+    const expected =
+      createSignature(payload);
+
+    if (
+      signature.length !==
+      expected.length
+    ) {
       return false;
     }
 
@@ -145,31 +163,50 @@ function checkSession(req) {
       return false;
     }
 
-    const data = JSON.parse(
-      Buffer.from(payload, "base64url").toString()
-    );
+    const data =
+      JSON.parse(
+        Buffer.from(
+          payload,
+          "base64url"
+        ).toString()
+      );
 
-    if (data.username !== ADMIN_USER) {
+    if (
+      data.username !==
+      ADMIN_USER
+    ) {
       return false;
     }
 
-    if (data.exp < Date.now()) {
+    if (
+      data.exp < Date.now()
+    ) {
       return false;
     }
 
     return true;
 
   } catch (error) {
+
     return false;
+
   }
 }
 
-function requireAdmin(req, res, next) {
+function requireAdmin(
+  req,
+  res,
+  next
+) {
+
   if (!checkSession(req)) {
+
     return res.status(401).json({
       ok: false,
-      message: "Login admin diperlukan."
+      message:
+        "Login admin diperlukan."
     });
+
   }
 
   next();
@@ -182,32 +219,30 @@ function requireAdmin(req, res, next) {
 let permitCounter = 0;
 
 function generatePermitNumber() {
+
   permitCounter++;
 
-  const year = new Date().getFullYear();
+  const year =
+    new Date().getFullYear();
 
   return (
     "IK-" +
     year +
     "-" +
-    String(permitCounter).padStart(4, "0")
+    String(permitCounter)
+      .padStart(4, "0")
   );
 }
 
 // ======================================================
-// DATA SEMENTARA
+// DATABASE SEMENTARA
 // ======================================================
 //
-// PENTING:
-// Vercel Function tidak cocok untuk database lokal.
-// Data ini hanya digunakan selama instance Function hidup.
+// CATATAN:
+// Ini hanya penyimpanan sementara.
 //
-// Untuk tahap awal ini kita fokus membuat:
-// - tombol Kirim bekerja
-// - email bekerja
-// - login admin bekerja
-// - PDF bisa dikirim sebagai attachment
-//
+// Pada Vercel, data in-memory tidak permanen.
+// Untuk produksi kita akan pindahkan ke database.
 // ======================================================
 
 const permits = [];
@@ -216,195 +251,354 @@ const permits = [];
 // HEALTH CHECK
 // ======================================================
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    app: "Izin Kerja Web",
-    platform: "Vercel",
-    time: new Date().toISOString()
-  });
-});
+app.get(
+  "/api/health",
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      app: "Izin Kerja Web",
+      platform: "Vercel",
+      time:
+        new Date().toISOString()
+    });
+
+  }
+);
 
 // ======================================================
-// NOMOR PERMIT
+// NOMOR PERMIT BERIKUTNYA
 // ======================================================
 
-app.get("/api/permit/next-number", (req, res) => {
-  res.json({
-    ok: true,
-    permitNo: generatePermitNumber()
-  });
-});
+app.get(
+  "/api/permit/next-number",
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      permitNo:
+        generatePermitNumber()
+    });
+
+  }
+);
 
 // ======================================================
 // LOGIN ADMIN
 // ======================================================
 
-app.post("/api/auth/login", (req, res) => {
+app.post(
+  "/api/auth/login",
+  (req, res) => {
 
-  const username = String(
-    req.body?.username || ""
-  );
+    const username =
+      String(
+        req.body?.username || ""
+      ).trim();
 
-  const password = String(
-    req.body?.password || ""
-  );
+    const password =
+      String(
+        req.body?.password || ""
+      );
 
-  if (
-    username === ADMIN_USER &&
-    password === ADMIN_PASS
-  ) {
+    if (
+      username === ADMIN_USER &&
+      password === ADMIN_PASS
+    ) {
 
-    const session = createSession();
+      const session =
+        createSession();
 
-    res.setHeader(
-      "Set-Cookie",
-      "ik_session=" +
-        session +
-        "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800"
-    );
+      res.setHeader(
+        "Set-Cookie",
+        "ik_session=" +
+          session +
+          "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800"
+      );
 
-    return res.json({
-      ok: true,
-      message: "Login berhasil."
+      return res.json({
+        ok: true,
+        message:
+          "Login berhasil."
+      });
+
+    }
+
+    return res.status(401).json({
+      ok: false,
+      message:
+        "Username atau password salah."
     });
+
   }
-
-  return res.status(401).json({
-    ok: false,
-    message: "Username atau password salah."
-  });
-});
+);
 
 // ======================================================
-// CEK LOGIN
+// CEK LOGIN ADMIN
 // ======================================================
 
-app.get("/api/auth/me", requireAdmin, (req, res) => {
+app.get(
+  "/api/auth/me",
+  requireAdmin,
+  (req, res) => {
 
-  res.json({
-    ok: true,
-    user: ADMIN_USER
-  });
+    res.json({
+      ok: true,
+      user: ADMIN_USER
+    });
 
-});
+  }
+);
 
 // ======================================================
 // LOGOUT
 // ======================================================
 
-app.post("/api/auth/logout", (req, res) => {
+app.post(
+  "/api/auth/logout",
+  (req, res) => {
 
-  res.setHeader(
-    "Set-Cookie",
-    "ik_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
-  );
+    res.setHeader(
+      "Set-Cookie",
+      "ik_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+    );
 
-  res.json({
-    ok: true
-  });
+    res.json({
+      ok: true,
+      message:
+        "Logout berhasil."
+    });
 
-});
+  }
+);
 
 // ======================================================
 // SIMPAN PERMOHONAN
 // ======================================================
+//
+// PENTING:
+// Tidak ada field yang diwajibkan.
+//
+// Form boleh:
+// - kosong sebagian
+// - baru diisi nama
+// - baru diisi lokasi
+// - baru pilih jenis pekerjaan
+// - atau hampir lengkap
+//
+// Semuanya tetap bisa disimpan.
+// Status awal otomatis DRAFT.
+// ======================================================
 
-app.post("/api/permits", (req, res) => {
+app.post(
+  "/api/permits",
+  (req, res) => {
 
-  try {
+    try {
 
-    const data = req.body?.data;
+      let data =
+        req.body?.data || {};
 
-    if (!data) {
+      // --------------------------------------------------
+      // Jika data dikirim sebagai JSON string
+      // --------------------------------------------------
 
-      return res.status(400).json({
+      if (
+        typeof data === "string"
+      ) {
+
+        try {
+
+          data =
+            JSON.parse(data);
+
+        } catch (error) {
+
+          data = {};
+
+        }
+
+      }
+
+      // --------------------------------------------------
+      // Pastikan data adalah object
+      // --------------------------------------------------
+
+      if (
+        !data ||
+        typeof data !== "object" ||
+        Array.isArray(data)
+      ) {
+
+        data = {};
+
+      }
+
+      // --------------------------------------------------
+      // Nomor permit
+      // --------------------------------------------------
+
+      const existingPermit =
+        String(
+          data.permitNo || ""
+        ).trim();
+
+      const permitNo =
+        existingPermit ||
+        generatePermitNumber();
+
+      // Masukkan nomor permit
+      // kembali ke data form.
+
+      data.permitNo =
+        permitNo;
+
+      // --------------------------------------------------
+      // Waktu
+      // --------------------------------------------------
+
+      const now =
+        new Date().toISOString();
+
+      // --------------------------------------------------
+      // Status
+      // --------------------------------------------------
+
+      const requestedStatus =
+        String(
+          data.status || "DRAFT"
+        ).toUpperCase();
+
+      const allowedStatuses = [
+        "DRAFT",
+        "DIAJUKAN",
+        "DISETUJUI",
+        "DITOLAK",
+        "SELESAI"
+      ];
+
+      const status =
+        allowedStatuses.includes(
+          requestedStatus
+        )
+          ? requestedStatus
+          : "DRAFT";
+
+      // --------------------------------------------------
+      // Buat row
+      // --------------------------------------------------
+
+      const row = {
+
+        id:
+          crypto.randomUUID(),
+
+        permitNo,
+
+        applicantName:
+          String(
+            data.applicantName || ""
+          ),
+
+        region:
+          String(
+            data.region || ""
+          ),
+
+        location:
+          String(
+            data.location || ""
+          ),
+
+        workTypes:
+          Array.isArray(
+            data.workTypes
+          )
+            ? data.workTypes
+            : [],
+
+        status,
+
+        createdAt: now,
+
+        updatedAt: now,
+
+        data
+
+      };
+
+      // --------------------------------------------------
+      // Simpan
+      // --------------------------------------------------
+
+      permits.push(row);
+
+      console.log(
+        "================================="
+      );
+
+      console.log(
+        "PERMIT TERSIMPAN"
+      );
+
+      console.log(
+        "ID:",
+        row.id
+      );
+
+      console.log(
+        "PERMIT:",
+        row.permitNo
+      );
+
+      console.log(
+        "STATUS:",
+        row.status
+      );
+
+      console.log(
+        "PEMOHON:",
+        row.applicantName
+      );
+
+      console.log(
+        "================================="
+      );
+
+      return res.status(201).json({
+
+        ok: true,
+
+        message:
+          "Data berhasil disimpan.",
+
+        row
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "ERROR /api/permits:",
+        error
+      );
+
+      return res.status(500).json({
+
         ok: false,
-        message: "Data form tidak ditemukan."
+
+        message:
+          "Gagal menyimpan data.",
+
+        detail:
+          error.message
+
       });
 
     }
 
-    let formData = data;
-
-    if (typeof data === "string") {
-
-      try {
-        formData = JSON.parse(data);
-      } catch (error) {
-
-        return res.status(400).json({
-          ok: false,
-          message: "Data form tidak valid."
-        });
-
-      }
-
-    }
-
-    const permitNo =
-      formData.permitNo ||
-      generatePermitNumber();
-
-    const row = {
-
-      id: crypto.randomUUID(),
-
-      permitNo,
-
-      applicantName:
-        formData.applicantName || "",
-
-      region:
-        formData.region || "",
-
-      location:
-        formData.location || "",
-
-      workTypes:
-        Array.isArray(formData.workTypes)
-          ? formData.workTypes
-          : [],
-
-      status: "DIAJUKAN",
-
-      createdAt:
-        new Date().toISOString(),
-
-      updatedAt:
-        new Date().toISOString(),
-
-      data: formData
-
-    };
-
-    permits.push(row);
-
-    return res.json({
-      ok: true,
-      row
-    });
-
-  } catch (error) {
-
-    console.error(
-      "ERROR /api/permits:",
-      error
-    );
-
-    return res.status(500).json({
-      ok: false,
-      message:
-        "Gagal menyimpan data.",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : undefined
-    });
-
   }
-
-});
+);
 
 // ======================================================
 // DAFTAR PERMIT
@@ -415,53 +609,115 @@ app.get(
   requireAdmin,
   (req, res) => {
 
-    const q = String(
-      req.query.q || ""
-    ).toLowerCase();
+    try {
 
-    const status = String(
-      req.query.status || ""
-    );
+      const q =
+        String(
+          req.query.q || ""
+        )
+        .trim()
+        .toLowerCase();
 
-    let rows = [...permits];
+      const status =
+        String(
+          req.query.status || ""
+        )
+        .trim()
+        .toUpperCase();
 
-    if (q) {
+      let rows =
+        [...permits];
 
-      rows = rows.filter(row => {
+      // --------------------------------------------------
+      // PENCARIAN
+      // --------------------------------------------------
 
-        const text = [
-          row.permitNo,
-          row.applicantName,
-          row.region,
-          row.location
-        ]
-          .join(" ")
-          .toLowerCase();
+      if (q) {
 
-        return text.includes(q);
+        rows =
+          rows.filter(
+            row => {
+
+              const text = [
+
+                row.permitNo,
+
+                row.applicantName,
+
+                row.region,
+
+                row.location,
+
+                row.status
+
+              ]
+                .join(" ")
+                .toLowerCase();
+
+              return text.includes(q);
+
+            }
+          );
+
+      }
+
+      // --------------------------------------------------
+      // FILTER STATUS
+      // --------------------------------------------------
+
+      if (status) {
+
+        rows =
+          rows.filter(
+            row =>
+              row.status === status
+          );
+
+      }
+
+      // --------------------------------------------------
+      // URUTKAN TERBARU
+      // --------------------------------------------------
+
+      rows.sort(
+        (a, b) =>
+          new Date(
+            b.createdAt
+          ) -
+          new Date(
+            a.createdAt
+          )
+      );
+
+      return res.json({
+
+        ok: true,
+
+        count:
+          rows.length,
+
+        rows:
+          rows.slice(0, 500)
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "ERROR GET /api/permits:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        message:
+          "Gagal mengambil data."
 
       });
 
     }
-
-    if (status) {
-
-      rows = rows.filter(
-        row => row.status === status
-      );
-
-    }
-
-    rows.sort(
-      (a, b) =>
-        new Date(b.createdAt) -
-        new Date(a.createdAt)
-    );
-
-    res.json({
-      ok: true,
-      rows: rows.slice(0, 500)
-    });
 
   }
 );
@@ -475,26 +731,59 @@ app.get(
   requireAdmin,
   (req, res) => {
 
-    const row =
-      permits.find(
-        item =>
-          item.id === req.params.id
+    try {
+
+      const id =
+        String(
+          req.params.id || ""
+        );
+
+      const row =
+        permits.find(
+          item =>
+            item.id === id
+        );
+
+      if (!row) {
+
+        return res.status(404).json({
+
+          ok: false,
+
+          message:
+            "Data tidak ditemukan.",
+
+          id
+
+        });
+
+      }
+
+      return res.json({
+
+        ok: true,
+
+        row
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "ERROR GET DETAIL:",
+        error
       );
 
-    if (!row) {
+      return res.status(500).json({
 
-      return res.status(404).json({
         ok: false,
+
         message:
-          "Data tidak ditemukan."
+          "Gagal mengambil detail data."
+
       });
 
     }
-
-    res.json({
-      ok: true,
-      row
-    });
 
   }
 );
@@ -508,52 +797,105 @@ app.patch(
   requireAdmin,
   (req, res) => {
 
-    const allowed = [
-      "DRAFT",
-      "DIAJUKAN",
-      "DISETUJUI",
-      "DITOLAK",
-      "SELESAI"
-    ];
+    try {
 
-    const status =
-      req.body?.status;
+      const allowed = [
 
-    if (!allowed.includes(status)) {
+        "DRAFT",
 
-      return res.status(400).json({
-        ok: false,
-        message:
-          "Status tidak valid."
-      });
+        "DIAJUKAN",
 
-    }
+        "DISETUJUI",
 
-    const row =
-      permits.find(
-        item =>
-          item.id === req.params.id
+        "DITOLAK",
+
+        "SELESAI"
+
+      ];
+
+      const status =
+        String(
+          req.body?.status || ""
+        ).toUpperCase();
+
+      if (
+        !allowed.includes(status)
+      ) {
+
+        return res.status(400).json({
+
+          ok: false,
+
+          message:
+            "Status tidak valid."
+
+        });
+
+      }
+
+      const row =
+        permits.find(
+          item =>
+            item.id ===
+            req.params.id
+        );
+
+      if (!row) {
+
+        return res.status(404).json({
+
+          ok: false,
+
+          message:
+            "Data tidak ditemukan."
+
+        });
+
+      }
+
+      row.status =
+        status;
+
+      row.data.status =
+        status;
+
+      row.updatedAt =
+        new Date().toISOString();
+
+      console.log(
+        "STATUS DIUBAH:",
+        row.permitNo,
+        status
       );
 
-    if (!row) {
+      return res.json({
 
-      return res.status(404).json({
-        ok: false,
+        ok: true,
+
         message:
-          "Data tidak ditemukan."
+          "Status berhasil diubah.",
+
+        row
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "ERROR PATCH STATUS:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        message:
+          "Gagal mengubah status."
+
       });
 
     }
-
-    row.status = status;
-
-    row.updatedAt =
-      new Date().toISOString();
-
-    res.json({
-      ok: true,
-      row
-    });
 
   }
 );
@@ -564,21 +906,34 @@ app.patch(
 
 function createTransporter() {
 
-  if (!SMTP_USER || !SMTP_PASS) {
+  if (
+    !SMTP_USER ||
+    !SMTP_PASS
+  ) {
+
     return null;
+
   }
 
   return nodemailer.createTransport({
 
-    host: SMTP_HOST,
+    host:
+      SMTP_HOST,
 
-    port: SMTP_PORT,
+    port:
+      SMTP_PORT,
 
-    secure: SMTP_SECURE,
+    secure:
+      SMTP_SECURE,
 
     auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
+
+      user:
+        SMTP_USER,
+
+      pass:
+        SMTP_PASS
+
     }
 
   });
@@ -614,22 +969,29 @@ app.post(
       let data =
         req.body?.data || {};
 
-      if (typeof data === "string") {
+      if (
+        typeof data === "string"
+      ) {
 
         try {
-          data = JSON.parse(data);
+
+          data =
+            JSON.parse(data);
+
         } catch (error) {
 
-          return res.status(400).json({
-
-            ok: false,
-
-            message:
-              "Data form tidak valid."
-
-          });
+          data = {};
 
         }
+
+      }
+
+      if (
+        !data ||
+        typeof data !== "object"
+      ) {
+
+        data = {};
 
       }
 
@@ -646,41 +1008,60 @@ app.post(
         data.location || "-";
 
       const workTypes =
-        Array.isArray(data.workTypes)
+        Array.isArray(
+          data.workTypes
+        )
           ? data.workTypes.join(", ")
           : String(
               data.workTypes || "-"
             );
 
-      // ==================================================
+      // --------------------------------------------------
       // PDF BASE64
-      // ==================================================
+      // --------------------------------------------------
 
       let pdfBuffer = null;
 
-      if (req.body?.pdfBase64) {
+      if (
+        req.body?.pdfBase64
+      ) {
 
         const base64 =
-          String(req.body.pdfBase64)
-            .replace(
-              /^data:application\/pdf;base64,/,
-              ""
-            );
-
-        pdfBuffer =
-          Buffer.from(
-            base64,
-            "base64"
+          String(
+            req.body.pdfBase64
+          )
+          .replace(
+            /^data:application\/pdf;base64,/,
+            ""
           );
 
+        try {
+
+          pdfBuffer =
+            Buffer.from(
+              base64,
+              "base64"
+            );
+
+        } catch (error) {
+
+          pdfBuffer = null;
+
+        }
+
       }
+
+      // --------------------------------------------------
+      // EMAIL
+      // --------------------------------------------------
 
       const mail = {
 
         from:
           `"${MAIL_FROM_NAME}" <${SMTP_USER}>`,
 
-        to: MAIL_TO,
+        to:
+          MAIL_TO,
 
         subject:
           "Pengisian Form Izin Kerja - Permit " +
@@ -688,7 +1069,10 @@ app.post(
 
         html:
           `
-          <div style="font-family:Arial,sans-serif">
+          <div style="
+            font-family:Arial,sans-serif;
+            color:#18202a;
+          ">
 
             <h2>
               Notifikasi Pengisian Form Izin Kerja
@@ -702,7 +1086,9 @@ app.post(
               cellpadding="8"
               cellspacing="0"
               border="1"
-              style="border-collapse:collapse"
+              style="
+                border-collapse:collapse;
+              "
             >
 
               <tr>
@@ -741,11 +1127,16 @@ app.post(
 
       };
 
+      // --------------------------------------------------
+      // ATTACHMENT PDF
+      // --------------------------------------------------
+
       if (pdfBuffer) {
 
         mail.attachments = [
 
           {
+
             filename:
               "izin-kerja-" +
               permit +
@@ -756,17 +1147,22 @@ app.post(
 
             contentType:
               "application/pdf"
+
           }
 
         ];
 
       }
 
+      // --------------------------------------------------
+      // KIRIM
+      // --------------------------------------------------
+
       await transporter.sendMail(
         mail
       );
 
-      res.json({
+      return res.json({
 
         ok: true,
 
@@ -783,7 +1179,7 @@ app.post(
         error
       );
 
-      res.status(500).json({
+      return res.status(500).json({
 
         ok: false,
 
@@ -801,6 +1197,24 @@ app.post(
 );
 
 // ======================================================
+// HALAMAN UTAMA
+// ======================================================
+
+app.get(
+  "/",
+  (req, res) => {
+
+    res.sendFile(
+      path.join(
+        __dirname,
+        "index.html"
+      )
+    );
+
+  }
+);
+
+// ======================================================
 // API 404
 // ======================================================
 
@@ -808,7 +1222,9 @@ app.use(
   (req, res, next) => {
 
     if (
-      req.path.startsWith("/api/")
+      req.path.startsWith(
+        "/api/"
+      )
     ) {
 
       return res.status(404).json({
@@ -831,17 +1247,18 @@ app.use(
 // FALLBACK
 // ======================================================
 
-app.use((req, res) => {
+app.use(
+  (req, res) => {
 
-  if (req.path.startsWith("/api/")) {
-    return res.status(404).json({
-      ok: false,
-      message: "API endpoint tidak ditemukan."
-    });
+    res.sendFile(
+      path.join(
+        __dirname,
+        "index.html"
+      )
+    );
+
   }
-
-  res.status(404).send("Halaman tidak ditemukan.");
-});
+);
 
 // ======================================================
 // LOCAL SERVER
@@ -861,8 +1278,30 @@ if (
     () => {
 
       console.log(
-        "Izin Kerja Web aktif di port " +
+        "================================="
+      );
+
+      console.log(
+        "IZIN KERJA WEB"
+      );
+
+      console.log(
+        "Server aktif di port:",
         port
+      );
+
+      console.log(
+        "Admin:",
+        ADMIN_USER
+      );
+
+      console.log(
+        "Email tujuan:",
+        MAIL_TO
+      );
+
+      console.log(
+        "================================="
       );
 
     }
