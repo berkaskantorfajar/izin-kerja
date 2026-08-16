@@ -1,1518 +1,1706 @@
 /* =========================================================
-   IZIN KERJA - APP.JS
-   KODE BROWSER / FRONTEND
+   APP.JS - FORM IZIN KERJA
    ========================================================= */
 
 (() => {
-  "use strict";
+    'use strict';
 
-  const $ = (selector, root = document) => root.querySelector(selector);
-  const $$ = (selector, root = document) =>
-    Array.from(root.querySelectorAll(selector));
+    /* =====================================================
+       KONFIGURASI
+       ===================================================== */
 
-  const toast = $("#toast");
+    const API = '';
 
-  function showToast(message, type = "info") {
-    if (!toast) {
-      alert(message);
-      return;
-    }
+    let currentSignatureTarget = null;
+    let signatureDrawing = false;
 
-    toast.textContent = message;
-    toast.className = "toast " + type;
+    /* =====================================================
+       HELPER
+       ===================================================== */
 
-    clearTimeout(window.__toastTimer);
+    const $ = (selector) => document.querySelector(selector);
 
-    window.__toastTimer = setTimeout(() => {
-      toast.className = "toast";
-      toast.textContent = "";
-    }, 5000);
-  }
+    const $$ = (selector) =>
+        Array.from(document.querySelectorAll(selector));
 
-  /* =======================================================
-     DATA CHECKBOX DINAMIS
-     ======================================================= */
+    function toast(message, type = 'info') {
+        const el = $('#toast');
 
-  const HAZARDS = [
-    "Kebakaran",
-    "Ledakan",
-    "Tersengat listrik",
-    "Terjatuh",
-    "Tertimpa benda",
-    "Terjepit",
-    "Terpotong",
-    "Terpapar panas",
-    "Terpapar bahan kimia",
-    "Debu / asap",
-    "Kebisingan",
-    "Getaran",
-    "Ruang terbatas",
-    "Kurang penerangan",
-    "Pergerakan kereta api",
-    "Lalu lintas kendaraan",
-    "Lingkungan kerja licin",
-    "Lain-lain"
-  ];
-
-  const PRECAUTIONS = [
-    "Area kerja sudah diamankan",
-    "Izin kerja telah diperiksa",
-    "Sumber listrik telah diputus",
-    "Peralatan telah diperiksa",
-    "APAR tersedia",
-    "Rambu keselamatan dipasang",
-    "Barikade dipasang",
-    "Penerangan cukup",
-    "Ventilasi cukup",
-    "Pengawasan pekerjaan tersedia",
-    "Komunikasi tersedia",
-    "Jalur evakuasi tersedia",
-    "Pekerja telah diberi pengarahan",
-    "Kondisi lingkungan telah diperiksa",
-    "Peralatan kerja layak digunakan",
-    "Lain-lain"
-  ];
-
-  const PPE = [
-    "Helm keselamatan",
-    "Sepatu keselamatan",
-    "Sarung tangan",
-    "Kacamata keselamatan",
-    "Pelindung wajah",
-    "Masker",
-    "Pelindung telinga",
-    "Rompi keselamatan",
-    "Full body harness",
-    "Respirator",
-    "Pakaian kerja",
-    "APD khusus sesuai pekerjaan"
-  ];
-
-  const APPROVALS = [
-    "Pemohon / Pelaksana",
-    "Pengawas Pekerjaan",
-    "Pemberi Izin",
-    "Penanggung Jawab"
-  ];
-
-  const COMPLETION = [
-    "Pekerjaan telah selesai",
-    "Area kerja telah dibersihkan",
-    "Peralatan telah dikembalikan",
-    "Tidak ada bahaya yang tersisa",
-    "Izin kerja dinyatakan selesai"
-  ];
-
-  function createCheckbox(containerId, name, values) {
-    const container = document.getElementById(containerId);
-
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    values.forEach((value, index) => {
-      const label = document.createElement("label");
-      label.className = "check";
-
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.name = name;
-      input.value = value;
-      input.id = `${name}_${index}`;
-
-      const span = document.createElement("span");
-      span.textContent = value;
-
-      label.appendChild(input);
-      label.appendChild(span);
-
-      container.appendChild(label);
-    });
-  }
-
-  function createApprovals() {
-    const container = $("#approvals");
-
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    APPROVALS.forEach((name, index) => {
-      const box = document.createElement("div");
-      box.className = "approval-box";
-
-      box.innerHTML = `
-        <div class="field-title">${escapeHtml(name)}</div>
-
-        <label>
-          Nama
-          <input name="approvalName${index + 1}">
-        </label>
-
-        <label>
-          Jabatan
-          <input name="approvalPosition${index + 1}">
-        </label>
-
-        <button
-          type="button"
-          class="signature-open"
-          data-target="approvalSignature${index + 1}">
-          Buka kolom tanda tangan
-        </button>
-
-        <input
-          type="hidden"
-          name="approvalSignature${index + 1}"
-          id="approvalSignature${index + 1}">
-      `;
-
-      container.appendChild(box);
-    });
-  }
-
-  function createCompletion() {
-    const container = $("#completion");
-
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    COMPLETION.forEach((value, index) => {
-      const label = document.createElement("label");
-      label.className = "check";
-
-      label.innerHTML = `
-        <input
-          type="checkbox"
-          name="completion"
-          value="${escapeAttribute(value)}"
-          id="completion_${index}">
-        <span>${escapeHtml(value)}</span>
-      `;
-
-      container.appendChild(label);
-    });
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, char => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    }[char]));
-  }
-
-  function escapeAttribute(value) {
-    return escapeHtml(value);
-  }
-
-  /* =======================================================
-     FORM DATA
-     ======================================================= */
-
-  function getFormData() {
-    const form = $("#permitForm");
-
-    if (!form) {
-      throw new Error("Form izin kerja tidak ditemukan.");
-    }
-
-    const data = {};
-
-    const elements = $$(
-      "input, textarea, select",
-      form
-    );
-
-    elements.forEach(element => {
-      if (!element.name) return;
-
-      if (element.type === "checkbox") {
-        return;
-      }
-
-      if (element.type === "radio") {
-        if (element.checked) {
-          data[element.name] = element.value;
+        if (!el) {
+            alert(message);
+            return;
         }
-        return;
-      }
 
-      data[element.name] = element.value;
-    });
+        el.textContent = message;
+        el.className = 'toast show ' + type;
 
-    [
-      "workTypes",
-      "equipment",
-      "hazards",
-      "precautions",
-      "ppe",
-      "completion"
-    ].forEach(name => {
-      data[name] = $$(
-        `input[name="${name}"]:checked`,
-        form
-      ).map(input => input.value);
-    });
+        clearTimeout(window.__toastTimer);
 
-    return data;
-  }
+        window.__toastTimer = setTimeout(() => {
+            el.className = 'toast';
+        }, 4000);
+    }
 
-  /* =======================================================
-     NOMOR PERMIT
-     ======================================================= */
+    function formDataObject() {
+        const form = $('#permitForm');
 
-  async function loadPermitNumber() {
-    const input = $('input[name="permitNo"]');
-
-    if (!input || input.value.trim()) return;
-
-    try {
-      const response = await fetch(
-        "/api/permit/next-number",
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json"
-          }
+        if (!form) {
+            throw new Error('Form tidak ditemukan.');
         }
-      );
 
-      if (!response.ok) {
-        throw new Error("Gagal mengambil nomor permit.");
-      }
+        const fd = new FormData(form);
+        const data = {};
 
-      const result = await response.json();
+        for (const [key, value] of fd.entries()) {
 
-      if (result.ok && result.permitNo) {
-        input.value = result.permitNo;
-      }
+            if (key === 'workTypes' ||
+                key === 'equipment' ||
+                key === 'hazards' ||
+                key === 'precautions' ||
+                key === 'ppe') {
 
-    } catch (error) {
-      console.error(error);
-      showToast(
-        "Nomor permit otomatis belum dapat diambil. Anda masih dapat mengisi form.",
-        "warning"
-      );
-    }
-  }
+                if (!Array.isArray(data[key])) {
+                    data[key] = [];
+                }
 
-  /* =======================================================
-     TANDA TANGAN
-     ======================================================= */
+                data[key].push(value);
 
-  let currentSignatureTarget = null;
+            } else {
 
-  const sigModal = $("#sigModal");
-  const sigCanvas = $("#sigCanvas");
-  const sigCtx = sigCanvas
-    ? sigCanvas.getContext("2d")
-    : null;
-
-  let drawing = false;
-
-  function prepareCanvas() {
-    if (!sigCanvas || !sigCtx) return;
-
-    sigCtx.clearRect(
-      0,
-      0,
-      sigCanvas.width,
-      sigCanvas.height
-    );
-
-    sigCtx.lineWidth = 3;
-    sigCtx.lineCap = "round";
-    sigCtx.lineJoin = "round";
-    sigCtx.strokeStyle = "#111827";
-  }
-
-  function canvasPosition(event) {
-    const rect = sigCanvas.getBoundingClientRect();
-
-    let clientX;
-    let clientY;
-
-    if (event.touches && event.touches.length) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    }
-
-    return {
-      x:
-        (clientX - rect.left) *
-        (sigCanvas.width / rect.width),
-
-      y:
-        (clientY - rect.top) *
-        (sigCanvas.height / rect.height)
-    };
-  }
-
-  function startDrawing(event) {
-    if (!sigCtx) return;
-
-    event.preventDefault();
-
-    drawing = true;
-
-    const position =
-      canvasPosition(event);
-
-    sigCtx.beginPath();
-
-    sigCtx.moveTo(
-      position.x,
-      position.y
-    );
-  }
-
-  function draw(event) {
-    if (!drawing || !sigCtx) return;
-
-    event.preventDefault();
-
-    const position =
-      canvasPosition(event);
-
-    sigCtx.lineTo(
-      position.x,
-      position.y
-    );
-
-    sigCtx.stroke();
-  }
-
-  function stopDrawing() {
-    drawing = false;
-  }
-
-  function openSignature(target) {
-    currentSignatureTarget = target;
-
-    if (!sigModal) return;
-
-    prepareCanvas();
-
-    sigModal.classList.remove("hidden");
-  }
-
-  function closeSignature() {
-    currentSignatureTarget = null;
-
-    if (sigModal) {
-      sigModal.classList.add("hidden");
-    }
-  }
-
-  function useSignature() {
-    if (!currentSignatureTarget || !sigCanvas) {
-      showToast(
-        "Kolom tanda tangan belum dipilih.",
-        "warning"
-      );
-      return;
-    }
-
-    const blankCanvas =
-      document.createElement("canvas");
-
-    blankCanvas.width =
-      sigCanvas.width;
-
-    blankCanvas.height =
-      sigCanvas.height;
-
-    if (
-      sigCanvas.toDataURL() ===
-      blankCanvas.toDataURL()
-    ) {
-      showToast(
-        "Silakan bubuhkan tanda tangan terlebih dahulu.",
-        "warning"
-      );
-      return;
-    }
-
-    const target =
-      document.getElementById(
-        currentSignatureTarget
-      );
-
-    if (!target) {
-      showToast(
-        "Kolom tanda tangan tidak ditemukan.",
-        "error"
-      );
-      return;
-    }
-
-    target.value =
-      sigCanvas.toDataURL("image/png");
-
-    closeSignature();
-
-    showToast(
-      "Tanda tangan berhasil digunakan.",
-      "success"
-    );
-  }
-
-  /* =======================================================
-     EVENT TANDA TANGAN
-     ======================================================= */
-
-  document.addEventListener(
-    "click",
-    event => {
-      const button =
-        event.target.closest(
-          ".signature-open"
-        );
-
-      if (!button) return;
-
-      const target =
-        button.dataset.target;
-
-      if (target) {
-        openSignature(target);
-      }
-    }
-  );
-
-  if (sigCanvas) {
-    sigCanvas.addEventListener(
-      "mousedown",
-      startDrawing
-    );
-
-    sigCanvas.addEventListener(
-      "mousemove",
-      draw
-    );
-
-    sigCanvas.addEventListener(
-      "mouseup",
-      stopDrawing
-    );
-
-    sigCanvas.addEventListener(
-      "mouseleave",
-      stopDrawing
-    );
-
-    sigCanvas.addEventListener(
-      "touchstart",
-      startDrawing,
-      { passive: false }
-    );
-
-    sigCanvas.addEventListener(
-      "touchmove",
-      draw,
-      { passive: false }
-    );
-
-    sigCanvas.addEventListener(
-      "touchend",
-      stopDrawing
-    );
-  }
-
-  $("#sigClear")?.addEventListener(
-    "click",
-    prepareCanvas
-  );
-
-  $("#sigCancel")?.addEventListener(
-    "click",
-    closeSignature
-  );
-
-  $("#sigUse")?.addEventListener(
-    "click",
-    useSignature
-  );
-
-  /* =======================================================
-     PDF
-     ======================================================= */
-
-  async function createPdfBlob() {
-    if (
-      !window.PDFLib ||
-      !window.PDFLib.PDFDocument
-    ) {
-      throw new Error(
-        "Library PDF belum berhasil dimuat."
-      );
-    }
-
-    const {
-      PDFDocument,
-      StandardFonts,
-      rgb
-    } = window.PDFLib;
-
-    const data = getFormData();
-
-    /*
-     * Untuk sementara membuat PDF hasil pengisian
-     * yang berisi data form secara lengkap.
-     *
-     * Template PDF asli akan kita integrasikan
-     * setelah fungsi kirim dasar sudah terbukti bekerja.
-     */
-
-    const pdfDoc =
-      await PDFDocument.create();
-
-    const page =
-      pdfDoc.addPage([
-        595.28,
-        841.89
-      ]);
-
-    const font =
-      await pdfDoc.embedFont(
-        StandardFonts.Helvetica
-      );
-
-    let y = 800;
-
-    function text(
-      value,
-      size = 10
-    ) {
-      if (y < 40) {
-        page = pdfDoc.addPage([
-          595.28,
-          841.89
-        ]);
-        y = 800;
-      }
-
-      page.drawText(
-        String(value ?? ""),
-        {
-          x: 40,
-          y,
-          size,
-          font,
-          color: rgb(
-            0,
-            0,
-            0
-          ),
-          maxWidth: 510
+                data[key] = value;
+            }
         }
-      );
 
-      y -=
-        size + 7;
+        /* Pastikan checkbox yang tidak dicentang tetap menjadi array */
+
+        const arrayFields = [
+            'workTypes',
+            'equipment',
+            'hazards',
+            'precautions',
+            'ppe'
+        ];
+
+        arrayFields.forEach(key => {
+            if (!Array.isArray(data[key])) {
+                data[key] = [];
+            }
+        });
+
+        return data;
     }
 
-    text(
-      "FORM IZIN KERJA",
-      18
-    );
-
-    text(
-      "Permit No: " +
-      (data.permitNo || "-"),
-      12
-    );
-
-    text(
-      "Pemohon: " +
-      (data.applicantName || "-")
-    );
-
-    text(
-      "Wilayah: " +
-      (data.region || "-")
-    );
-
-    text(
-      "Lokasi: " +
-      (data.location || "-")
-    );
-
-    text(
-      "Jenis Izin: " +
-      (
-        data.workTypes || []
-      ).join(", ")
-    );
-
-    text("");
-
-    text(
-      "DESKRIPSI PEKERJAAN",
-      13
-    );
-
-    text(
-      data.jobDescription ||
-      "-"
-    );
-
-    text("");
-
-    text(
-      "JENIS PERALATAN",
-      13
-    );
-
-    text(
-      (
-        data.equipment || []
-      ).join(", ") ||
-      "-"
-    );
-
-    text("");
-
-    text(
-      "BAHAYA",
-      13
-    );
-
-    text(
-      (
-        data.hazards || []
-      ).join(", ") ||
-      "-"
-    );
-
-    text("");
-
-    text(
-      "TINDAKAN PENCEGAHAN",
-      13
-    );
-
-    text(
-      (
-        data.precautions || []
-      ).join(", ") ||
-      "-"
-    );
-
-    text("");
-
-    text(
-      "APD",
-      13
-    );
-
-    text(
-      (
-        data.ppe || []
-      ).join(", ") ||
-      "-"
-    );
-
-    text("");
-
-    text(
-      "Pemberi Izin: " +
-      (data.issuerName || "-")
-    );
-
-    text(
-      "Pengawas: " +
-      (data.supervisorName || "-")
-    );
-
-    text(
-      "Tanggal dibuat: " +
-      new Date().toLocaleString(
-        "id-ID"
-      )
-    );
-
-    const bytes =
-      await pdfDoc.save();
-
-    return new Blob(
-      [bytes],
-      {
-        type: "application/pdf"
-      }
-    );
-  }
-
-  /* =======================================================
-     DOWNLOAD PDF
-     ======================================================= */
-
-  async function savePdf() {
-    try {
-      showToast(
-        "Sedang membuat PDF...",
-        "info"
-      );
-
-      const blob =
-        await createPdfBlob();
-
-      const data =
-        getFormData();
-
-      const permit =
-        data.permitNo ||
-        "izin-kerja";
-
-      const url =
-        URL.createObjectURL(blob);
-
-      const a =
-        document.createElement("a");
-
-      a.href = url;
-
-      a.download =
-        `izin-kerja-${permit}.pdf`;
-
-      document.body.appendChild(a);
-
-      a.click();
-
-      a.remove();
-
-      setTimeout(
-        () =>
-          URL.revokeObjectURL(url),
-        1000
-      );
-
-      showToast(
-        "PDF berhasil dibuat.",
-        "success"
-      );
-
-    } catch (error) {
-      console.error(error);
-
-      showToast(
-        "Gagal membuat PDF: " +
-        error.message,
-        "error"
-      );
-    }
-  }
-
-  $("#saveBtn")?.addEventListener(
-    "click",
-    savePdf
-  );
-
-  /* =======================================================
-     KIRIM EMAIL
-     ======================================================= */
-
-  async function sendForm() {
-    const button =
-      $("#sendBtn");
-
-    try {
-      if (button) {
-        button.disabled = true;
-        button.textContent =
-          "Mengirim...";
-      }
-
-      showToast(
-        "Sedang membuat PDF dan mengirim email...",
-        "info"
-      );
-
-      const data =
-        getFormData();
-
-      if (!data.applicantName) {
-        throw new Error(
-          "Nama pemohon belum diisi."
-        );
-      }
-
-      if (!data.location) {
-        throw new Error(
-          "Lokasi pekerjaan belum diisi."
-        );
-      }
-
-      const pdfBlob =
-        await createPdfBlob();
-
-      const formData =
-        new FormData();
-
-      formData.append(
-        "pdf",
-        pdfBlob,
-        `izin-kerja-${data.permitNo || "baru"}.pdf`
-      );
-
-      formData.append(
-        "data",
-        JSON.stringify(data)
-      );
-
-      const response =
-        await fetch(
-          "/api/send-email",
-          {
-            method: "POST",
-            body: formData
-          }
-        );
-
-      let result;
-
-      try {
-        result =
-          await response.json();
-      } catch {
-        throw new Error(
-          "Server memberikan respons yang tidak valid."
-        );
-      }
-
-      if (!response.ok || !result.ok) {
-        throw new Error(
-          result.message ||
-          `Gagal mengirim email (${response.status}).`
-        );
-      }
-
-      showToast(
-        result.message ||
-        "Form berhasil dikirim.",
-        "success"
-      );
-
-    } catch (error) {
-      console.error(
-        "KIRIM ERROR:",
-        error
-      );
-
-      showToast(
-        error.message ||
-        "Gagal mengirim form.",
-        "error"
-      );
-
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.innerHTML =
-          "Kirim<small>Email</small>";
-      }
-    }
-  }
-
-  $("#sendBtn")?.addEventListener(
-    "click",
-    event => {
-      event.preventDefault();
-      sendForm();
-    }
-  );
-
-  /* =======================================================
-     PREVIEW PDF
-     ======================================================= */
-
-  $("#previewBtn")?.addEventListener(
-    "click",
-    async event => {
-      event.preventDefault();
-
-      try {
-        showToast(
-          "Membuka pratinjau PDF...",
-          "info"
-        );
-
-        const blob =
-          await createPdfBlob();
-
-        const url =
-          URL.createObjectURL(blob);
-
-        window.open(
-          url,
-          "_blank"
-        );
-
-        setTimeout(
-          () =>
-            URL.revokeObjectURL(url),
-          60000
-        );
-
-      } catch (error) {
-        console.error(error);
-
-        showToast(
-          "Gagal membuka PDF: " +
-          error.message,
-          "error"
-        );
-      }
-    }
-  );
-
-  /* =======================================================
-     ATAS
-     ======================================================= */
-
-  $("#topBtn")?.addEventListener(
-    "click",
-    () => {
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-    }
-  );
-
-  /* =======================================================
-     ADMIN
-     ======================================================= */
-
-  const adminModal =
-    $("#adminModal");
-
-  const loginBox =
-    $("#loginBox");
-
-  const dashboardBox =
-    $("#dashboardBox");
-
-  function openAdmin() {
-    adminModal?.classList.remove(
-      "hidden"
-    );
-
-    checkAdmin();
-  }
-
-  function closeAdmin() {
-    adminModal?.classList.add(
-      "hidden"
-    );
-  }
-
-  async function checkAdmin() {
-    try {
-      const response =
-        await fetch(
-          "/api/auth/me",
-          {
-            credentials: "same-origin"
-          }
-        );
-
-      if (!response.ok) {
-        showLogin();
-        return;
-      }
-
-      const result =
-        await response.json();
-
-      if (result.ok) {
-        showDashboard();
-        loadPermits();
-      } else {
-        showLogin();
-      }
-
-    } catch {
-      showLogin();
-    }
-  }
-
-  function showLogin() {
-    loginBox?.classList.remove(
-      "hidden"
-    );
-
-    dashboardBox?.classList.add(
-      "hidden"
-    );
-  }
-
-  function showDashboard() {
-    loginBox?.classList.add(
-      "hidden"
-    );
-
-    dashboardBox?.classList.remove(
-      "hidden"
-    );
-  }
-
-  async function loginAdmin() {
-    const username =
-      $("#adminUser")?.value ||
-      "";
-
-    const password =
-      $("#adminPass")?.value ||
-      "";
-
-    if (!username || !password) {
-      showToast(
-        "Username dan password wajib diisi.",
-        "warning"
-      );
-      return;
-    }
-
-    try {
-      const response =
-        await fetch(
-          "/api/auth/login",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            credentials:
-              "same-origin",
-            body: JSON.stringify({
-              username,
-              password
-            })
-          }
-        );
-
-      const result =
-        await response.json();
-
-      if (!response.ok || !result.ok) {
-        throw new Error(
-          result.message ||
-          "Login gagal."
-        );
-      }
-
-      showToast(
-        "Login admin berhasil.",
-        "success"
-      );
-
-      showDashboard();
-
-      loadPermits();
-
-    } catch (error) {
-      showToast(
-        error.message,
-        "error"
-      );
-    }
-  }
-
-  async function logoutAdmin() {
-    try {
-      await fetch(
-        "/api/auth/logout",
-        {
-          method: "POST",
-          credentials:
-            "same-origin"
+    function setField(name, value) {
+        const el = document.querySelector(`[name="${name}"]`);
+
+        if (el) {
+            el.value = value ?? '';
         }
-      );
-    } finally {
-      showLogin();
-
-      showToast(
-        "Anda telah keluar.",
-        "success"
-      );
-    }
-  }
-
-  async function loadPermits() {
-    const table =
-      $("#permitTable");
-
-    if (!table) return;
-
-    table.innerHTML =
-      "<p>Memuat data...</p>";
-
-    const q =
-      $("#searchPermit")?.value ||
-      "";
-
-    const status =
-      $("#statusFilter")?.value ||
-      "";
-
-    try {
-      const params =
-        new URLSearchParams();
-
-      if (q) {
-        params.set(
-          "q",
-          q
-        );
-      }
-
-      if (status) {
-        params.set(
-          "status",
-          status
-        );
-      }
-
-      const response =
-        await fetch(
-          "/api/permits?" +
-          params.toString(),
-          {
-            credentials:
-              "same-origin"
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          "Tidak dapat mengambil data."
-        );
-      }
-
-      const result =
-        await response.json();
-
-      if (!result.ok) {
-        throw new Error(
-          result.message ||
-          "Gagal mengambil data."
-        );
-      }
-
-      renderPermits(
-        result.rows || []
-      );
-
-    } catch (error) {
-      table.innerHTML =
-        `<p>${escapeHtml(
-          error.message
-        )}</p>`;
-    }
-  }
-
-  function renderPermits(rows) {
-    const table =
-      $("#permitTable");
-
-    if (!table) return;
-
-    if (!rows.length) {
-      table.innerHTML =
-        "<p>Belum ada data izin.</p>";
-      return;
     }
 
-    let html = `
-      <div style="overflow:auto">
-      <table>
-        <thead>
-          <tr>
-            <th>Permit</th>
-            <th>Pemohon</th>
-            <th>Wilayah</th>
-            <th>Lokasi</th>
-            <th>Status</th>
-            <th>Tanggal</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+    /* =====================================================
+       DATA CHECKBOX
+       ===================================================== */
 
-    rows.forEach(row => {
-      html += `
-        <tr>
-          <td>${escapeHtml(
-            row.permitNo
-          )}</td>
+    const HAZARDS = [
+        'Kebakaran',
+        'Ledakan',
+        'Tersengat listrik',
+        'Jatuh dari ketinggian',
+        'Tertimpa benda',
+        'Terjepit',
+        'Terpeleset',
+        'Paparan panas',
+        'Paparan debu',
+        'Paparan bahan kimia',
+        'Kebisingan',
+        'Getaran',
+        'Asap / gas berbahaya',
+        'Ruang terbatas',
+        'Alat berat',
+        'Lalu lintas kendaraan',
+        'Pergerakan kereta api',
+        'Bahaya lainnya'
+    ];
 
-          <td>${escapeHtml(
-            row.applicantName
-          )}</td>
+    const PRECAUTIONS = [
+        'Area kerja sudah diamankan',
+        'Memasang rambu keselamatan',
+        'Memasang pembatas area',
+        'Melakukan pemeriksaan peralatan',
+        'Memastikan peralatan laik digunakan',
+        'Memastikan sumber listrik aman',
+        'Memastikan APAR tersedia',
+        'Memastikan ventilasi cukup',
+        'Menggunakan alat pelindung diri',
+        'Menunjuk pengawas pekerjaan',
+        'Melakukan briefing keselamatan',
+        'Memastikan komunikasi tersedia',
+        'Mengamankan material dan peralatan',
+        'Membersihkan area kerja setelah selesai',
+        'Menghentikan pekerjaan apabila kondisi tidak aman'
+    ];
 
-          <td>${escapeHtml(
-            row.region
-          )}</td>
+    const PPE = [
+        'Helm keselamatan',
+        'Sepatu keselamatan',
+        'Sarung tangan',
+        'Kacamata keselamatan',
+        'Pelindung wajah',
+        'Pelindung telinga',
+        'Masker',
+        'Respirator',
+        'Rompi keselamatan',
+        'Full body harness',
+        'Safety belt',
+        'Pakaian kerja',
+        'APD lainnya'
+    ];
 
-          <td>${escapeHtml(
-            row.location
-          )}</td>
+    const APPROVALS = [
+        'Pemohon / Pelaksana Pekerjaan',
+        'Pengawas Pekerjaan',
+        'Pemberi Izin',
+        'Penanggung Jawab'
+    ];
 
-          <td>
-            <select
-              class="status-change"
-              data-id="${escapeAttribute(
-                row.id
-              )}">
-              ${[
-                "DRAFT",
-                "DIAJUKAN",
-                "DISETUJUI",
-                "DITOLAK",
-                "SELESAI"
-              ].map(status => `
-                <option
-                  value="${status}"
-                  ${row.status === status ? "selected" : ""}>
-                  ${status}
-                </option>
-              `).join("")}
-            </select>
-          </td>
+    const COMPLETION = [
+        'Pekerjaan telah selesai',
+        'Area kerja telah dibersihkan',
+        'Peralatan telah dikembalikan',
+        'Kondisi area telah aman',
+        'Izin kerja dinyatakan selesai'
+    ];
 
-          <td>${escapeHtml(
-            new Date(
-              row.createdAt
-            ).toLocaleString(
-              "id-ID"
-            )
-          )}</td>
+    /* =====================================================
+       RENDER CHECKBOX
+       ===================================================== */
 
-          <td>
-            <button
-              type="button"
-              class="download-admin-pdf"
-              data-id="${escapeAttribute(
-                row.id
-              )}">
-              PDF
-            </button>
-          </td>
-        </tr>
-      `;
-    });
+    function renderCheckboxes(containerId, items, name) {
 
-    html += `
-        </tbody>
-      </table>
-      </div>
-    `;
+        const container = document.getElementById(containerId);
 
-    table.innerHTML =
-      html;
-  }
+        if (!container) {
+            return;
+        }
 
-  async function changeStatus(
-    id,
-    status
-  ) {
-    try {
-      const response =
-        await fetch(
-          `/api/permits/${encodeURIComponent(
-            id
-          )}/status`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            credentials:
-              "same-origin",
-            body: JSON.stringify({
-              status
-            })
-          }
-        );
+        container.innerHTML = '';
 
-      const result =
-        await response.json();
+        items.forEach((item, index) => {
 
-      if (!response.ok || !result.ok) {
-        throw new Error(
-          result.message ||
-          "Gagal mengubah status."
-        );
-      }
+            const id =
+                name +
+                '_' +
+                index;
 
-      showToast(
-        "Status berhasil diubah.",
-        "success"
-      );
+            const label =
+                document.createElement('label');
 
-    } catch (error) {
-      showToast(
-        error.message,
-        "error"
-      );
+            label.className = 'check';
+
+            label.innerHTML =
+                `
+                <input
+                    type="checkbox"
+                    id="${id}"
+                    name="${name}"
+                    value="${escapeHtml(item)}"
+                >
+                <span>${escapeHtml(item)}</span>
+                `;
+
+            container.appendChild(label);
+        });
     }
-  }
 
-  $("#adminBtn")?.addEventListener(
-    "click",
-    openAdmin
-  );
+    function renderApprovals() {
 
-  $("#loginCancel")?.addEventListener(
-    "click",
-    closeAdmin
-  );
+        const container = $('#approvals');
 
-  $("#loginBtn")?.addEventListener(
-    "click",
-    loginAdmin
-  );
+        if (!container) {
+            return;
+        }
 
-  $("#logoutBtn")?.addEventListener(
-    "click",
-    logoutAdmin
-  );
+        container.innerHTML = '';
 
-  $("#searchPermit")?.addEventListener(
-    "input",
-    () => {
-      clearTimeout(
-        window.__searchTimer
-      );
+        APPROVALS.forEach((item, index) => {
 
-      window.__searchTimer =
-        setTimeout(
-          loadPermits,
-          400
-        );
+            const wrapper =
+                document.createElement('div');
+
+            wrapper.className = 'approval-item';
+
+            wrapper.innerHTML = `
+                <div class="approval-title">
+                    ${escapeHtml(item)}
+                </div>
+
+                <label>
+                    Nama
+                    <input
+                        name="approvalName${index + 1}"
+                    >
+                </label>
+
+                <button
+                    type="button"
+                    class="signature-open"
+                    data-target="approvalSignature${index + 1}"
+                >
+                    Buka kolom tanda tangan
+                </button>
+
+                <input
+                    type="hidden"
+                    name="approvalSignature${index + 1}"
+                    id="approvalSignature${index + 1}"
+                >
+            `;
+
+            container.appendChild(wrapper);
+        });
     }
-  );
 
-  $("#statusFilter")?.addEventListener(
-    "change",
-    loadPermits
-  );
+    function renderCompletion() {
 
-  $("#permitTable")?.addEventListener(
-    "change",
-    event => {
-      const select =
-        event.target.closest(
-          ".status-change"
-        );
+        const container = $('#completion');
 
-      if (!select) return;
+        if (!container) {
+            return;
+        }
 
-      changeStatus(
-        select.dataset.id,
-        select.value
-      );
+        container.innerHTML = '';
+
+        COMPLETION.forEach((item, index) => {
+
+            const label =
+                document.createElement('label');
+
+            label.className = 'check';
+
+            label.innerHTML = `
+                <input
+                    type="checkbox"
+                    name="completion"
+                    value="${escapeHtml(item)}"
+                >
+                <span>${escapeHtml(item)}</span>
+            `;
+
+            container.appendChild(label);
+        });
     }
-  );
 
-  $("#permitTable")?.addEventListener(
-    "click",
-    event => {
-      const button =
-        event.target.closest(
-          ".download-admin-pdf"
-        );
+    function escapeHtml(value) {
 
-      if (!button) return;
-
-      const id =
-        button.dataset.id;
-
-      window.open(
-        `/api/permits/${encodeURIComponent(
-          id
-        )}/pdf`,
-        "_blank"
-      );
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
-  );
 
-  /* =======================================================
-     TUTUP MODAL KETIKA KLIK AREA LUAR
-     ======================================================= */
+    /* =====================================================
+       NOMOR PERMIT
+       ===================================================== */
 
-  [sigModal, adminModal].forEach(
-    modal => {
-      modal?.addEventListener(
-        "click",
-        event => {
-          if (
-            event.target === modal
-          ) {
-            modal.classList.add(
-              "hidden"
+    async function loadPermitNumber() {
+
+        const input =
+            document.querySelector(
+                '[name="permitNo"]'
             );
-          }
+
+        if (!input) {
+            return;
         }
-      );
+
+        if (input.value.trim()) {
+            return;
+        }
+
+        try {
+
+            const response =
+                await fetch(
+                    API +
+                    '/api/permit/next-number'
+                );
+
+            const result =
+                await response.json();
+
+            if (
+                result &&
+                result.ok &&
+                result.permitNo
+            ) {
+
+                input.value =
+                    result.permitNo;
+            }
+
+        } catch (error) {
+
+            console.error(
+                'Gagal mengambil nomor permit:',
+                error
+            );
+        }
     }
-  );
 
-  /* =======================================================
-     INISIALISASI
-     ======================================================= */
+    /* =====================================================
+       SIGNATURE
+       ===================================================== */
 
-  function initialize() {
-    createCheckbox(
-      "hazards",
-      "hazards",
-      HAZARDS
-    );
+    function setupSignature() {
 
-    createCheckbox(
-      "precautions",
-      "precautions",
-      PRECAUTIONS
-    );
+        const modal = $('#sigModal');
+        const canvas = $('#sigCanvas');
 
-    createCheckbox(
-      "ppe",
-      "ppe",
-      PPE
-    );
+        if (!modal || !canvas) {
+            return;
+        }
 
-    createApprovals();
+        const ctx =
+            canvas.getContext('2d');
 
-    createCompletion();
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-    loadPermitNumber();
+        function position(event) {
 
-    console.log(
-      "IZIN KERJA APP.JS berhasil dimuat."
-    );
-  }
+            const rect =
+                canvas.getBoundingClientRect();
 
-  if (
-    document.readyState ===
-    "loading"
-  ) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      initialize
-    );
-  } else {
-    initialize();
-  }
+            const source =
+                event.touches
+                    ? event.touches[0]
+                    : event;
+
+            return {
+                x:
+                    (source.clientX - rect.left) *
+                    (canvas.width / rect.width),
+
+                y:
+                    (source.clientY - rect.top) *
+                    (canvas.height / rect.height)
+            };
+        }
+
+        function start(event) {
+
+            event.preventDefault();
+
+            signatureDrawing = true;
+
+            const p = position(event);
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                p.x,
+                p.y
+            );
+        }
+
+        function draw(event) {
+
+            if (!signatureDrawing) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const p = position(event);
+
+            ctx.lineTo(
+                p.x,
+                p.y
+            );
+
+            ctx.stroke();
+        }
+
+        function stop(event) {
+
+            if (event) {
+                event.preventDefault();
+            }
+
+            signatureDrawing = false;
+        }
+
+        canvas.addEventListener(
+            'mousedown',
+            start
+        );
+
+        canvas.addEventListener(
+            'mousemove',
+            draw
+        );
+
+        canvas.addEventListener(
+            'mouseup',
+            stop
+        );
+
+        canvas.addEventListener(
+            'mouseleave',
+            stop
+        );
+
+        canvas.addEventListener(
+            'touchstart',
+            start,
+            { passive: false }
+        );
+
+        canvas.addEventListener(
+            'touchmove',
+            draw,
+            { passive: false }
+        );
+
+        canvas.addEventListener(
+            'touchend',
+            stop,
+            { passive: false }
+        );
+
+        $('#sigClear')?.addEventListener(
+            'click',
+            () => {
+                ctx.clearRect(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
+            }
+        );
+
+        $('#sigCancel')?.addEventListener(
+            'click',
+            () => {
+                modal.classList.add('hidden');
+                currentSignatureTarget = null;
+            }
+        );
+
+        $('#sigUse')?.addEventListener(
+            'click',
+            () => {
+
+                if (!currentSignatureTarget) {
+                    return;
+                }
+
+                const target =
+                    document.getElementById(
+                        currentSignatureTarget
+                    );
+
+                if (target) {
+
+                    target.value =
+                        canvas.toDataURL(
+                            'image/png'
+                        );
+                }
+
+                modal.classList.add(
+                    'hidden'
+                );
+
+                currentSignatureTarget = null;
+
+                toast(
+                    'Tanda tangan berhasil digunakan.',
+                    'success'
+                );
+            }
+        );
+
+        document.addEventListener(
+            'click',
+            event => {
+
+                const button =
+                    event.target.closest(
+                        '.signature-open'
+                    );
+
+                if (!button) {
+                    return;
+                }
+
+                currentSignatureTarget =
+                    button.dataset.target;
+
+                ctx.clearRect(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
+
+                const existing =
+                    document.getElementById(
+                        currentSignatureTarget
+                    );
+
+                if (
+                    existing &&
+                    existing.value &&
+                    existing.value.startsWith(
+                        'data:image'
+                    )
+                ) {
+
+                    const img =
+                        new Image();
+
+                    img.onload = () => {
+
+                        ctx.drawImage(
+                            img,
+                            0,
+                            0,
+                            canvas.width,
+                            canvas.height
+                        );
+                    };
+
+                    img.src =
+                        existing.value;
+                }
+
+                modal.classList.remove(
+                    'hidden'
+                );
+            }
+        );
+    }
+
+    /* =====================================================
+       PDF
+       ===================================================== */
+
+    async function createPDF() {
+
+        if (
+            typeof PDFLib ===
+            'undefined'
+        ) {
+
+            throw new Error(
+                'Library PDF belum dimuat. Periksa koneksi internet.'
+            );
+        }
+
+        const {
+            PDFDocument
+        } = PDFLib;
+
+        /*
+         * PDF dibuat dari tampilan form.
+         * Versi ini memastikan tombol bekerja.
+         */
+
+        const pdfDoc =
+            await PDFDocument.create();
+
+        const page =
+            pdfDoc.addPage([
+                595.28,
+                841.89
+            ]);
+
+        const {
+            width,
+            height
+        } = page.getSize();
+
+        const font =
+            await pdfDoc.embedFont(
+                PDFLib.StandardFonts.Helvetica
+            );
+
+        const bold =
+            await pdfDoc.embedFont(
+                PDFLib.StandardFonts.HelveticaBold
+            );
+
+        const data =
+            formDataObject();
+
+        let y =
+            height - 40;
+
+        function text(
+            value,
+            size = 9,
+            fontUsed = font
+        ) {
+
+            const str =
+                String(value ?? '');
+
+            const maxWidth =
+                width - 60;
+
+            let current = '';
+
+            const words =
+                str.split(/\s+/);
+
+            for (const word of words) {
+
+                const test =
+                    current
+                        ? current + ' ' + word
+                        : word;
+
+                if (
+                    fontUsed.widthOfTextAtSize(
+                        test,
+                        size
+                    ) > maxWidth
+                ) {
+
+                    page.drawText(
+                        current,
+                        {
+                            x: 30,
+                            y,
+                            size,
+                            font: fontUsed
+                        }
+                    );
+
+                    y -= size + 4;
+
+                    current = word;
+
+                } else {
+
+                    current = test;
+                }
+            }
+
+            if (current) {
+
+                page.drawText(
+                    current,
+                    {
+                        x: 30,
+                        y,
+                        size,
+                        font: fontUsed
+                    }
+                );
+
+                y -= size + 4;
+            }
+        }
+
+        text(
+            'FORM IZIN KERJA',
+            16,
+            bold
+        );
+
+        y -= 10;
+
+        const fields = [
+            ['Permit No', data.permitNo],
+            ['Kode Dokumen', data.docCode],
+            ['Level Dokumen', data.docLevel],
+            ['Revisi', data.revision],
+            ['Tanggal Berlaku', data.effectiveDate],
+            ['Wilayah', data.region],
+            ['Pemohon / Nama', data.applicantName],
+            ['Lokasi', data.location],
+            ['Jenis Izin', data.workTypes.join(', ')],
+            ['Deskripsi Pekerjaan', data.jobDescription],
+            ['Jenis Peralatan', data.equipment.join(', ')],
+            ['Bahaya', data.hazards.join(', ')],
+            ['Tindakan Pencegahan', data.precautions.join(', ')],
+            ['APD', data.ppe.join(', ')],
+            ['Tindakan Keselamatan Lain', data.otherSafety],
+            ['Catatan Izin', data.permissionNote],
+            ['Dari Tanggal', data.fromDate],
+            ['Dari Jam', data.fromTime],
+            ['Sampai Tanggal', data.toDate],
+            ['Sampai Jam', data.toTime],
+            ['Pemberi Izin', data.issuerName],
+            ['Pengawas Pekerjaan', data.supervisorName],
+            ['Alasan Pembatalan', data.cancelReason],
+            ['Pernyataan Dapat Dimulai Kembali', data.resumeStatement],
+            ['Penanggung Jawab', data.finalResponsible],
+            ['Nama Akhir', data.finalName],
+            ['Instansi', data.finalInstitution],
+            ['Tanggal Penyelesaian', data.finalDate],
+            ['Jam Penyelesaian', data.finalTime]
+        ];
+
+        for (const [label, value] of fields) {
+
+            if (
+                y < 50
+            ) {
+
+                const newPage =
+                    pdfDoc.addPage([
+                        595.28,
+                        841.89
+                    ]);
+
+                y =
+                    newPage.getSize().height -
+                    40;
+            }
+
+            text(
+                label + ': ' + (value || '-'),
+                8
+            );
+        }
+
+        return await pdfDoc.save();
+    }
+
+    /* =====================================================
+       DOWNLOAD PDF
+       ===================================================== */
+
+    async function savePDF() {
+
+        try {
+
+            toast(
+                'Sedang membuat PDF...',
+                'info'
+            );
+
+            const bytes =
+                await createPDF();
+
+            const blob =
+                new Blob(
+                    [bytes],
+                    {
+                        type:
+                            'application/pdf'
+                    }
+                );
+
+            const url =
+                URL.createObjectURL(
+                    blob
+                );
+
+            const a =
+                document.createElement(
+                    'a'
+                );
+
+            const data =
+                formDataObject();
+
+            a.href = url;
+
+            a.download =
+                'izin-kerja-' +
+                (data.permitNo ||
+                    'baru') +
+                '.pdf';
+
+            document.body.appendChild(a);
+
+            a.click();
+
+            a.remove();
+
+            URL.revokeObjectURL(
+                url
+            );
+
+            toast(
+                'PDF berhasil dibuat.',
+                'success'
+            );
+
+        } catch (error) {
+
+            console.error(
+                'PDF ERROR:',
+                error
+            );
+
+            toast(
+                error.message ||
+                'Gagal membuat PDF.',
+                'error'
+            );
+        }
+    }
+
+    /* =====================================================
+       KIRIM KE SERVER
+       ===================================================== */
+
+    async function submitPermit() {
+
+        try {
+
+            const form =
+                $('#permitForm');
+
+            if (!form) {
+                throw new Error(
+                    'Form tidak ditemukan.'
+                );
+            }
+
+            /* Validasi sederhana */
+
+            const data =
+                formDataObject();
+
+            if (
+                !data.applicantName ||
+                !data.applicantName.trim()
+            ) {
+
+                toast(
+                    'Nama pemohon belum diisi.',
+                    'error'
+                );
+
+                document
+                    .querySelector(
+                        '[name="applicantName"]'
+                    )
+                    ?.focus();
+
+                return;
+            }
+
+            if (
+                !data.location ||
+                !data.location.trim()
+            ) {
+
+                toast(
+                    'Lokasi pekerjaan belum diisi.',
+                    'error'
+                );
+
+                document
+                    .querySelector(
+                        '[name="location"]'
+                    )
+                    ?.focus();
+
+                return;
+            }
+
+            toast(
+                'Membuat PDF dan mengirim...',
+                'info'
+            );
+
+            /* Buat PDF */
+
+            const pdfBytes =
+                await createPDF();
+
+            /* Simpan data + PDF */
+
+            const uploadData =
+                new FormData();
+
+            uploadData.append(
+                'data',
+                JSON.stringify(data)
+            );
+
+            uploadData.append(
+                'pdf',
+                new Blob(
+                    [pdfBytes],
+                    {
+                        type:
+                            'application/pdf'
+                    }
+                ),
+                'izin-kerja-' +
+                (data.permitNo ||
+                    'baru') +
+                '.pdf'
+            );
+
+            const saveResponse =
+                await fetch(
+                    API +
+                    '/api/permits',
+                    {
+                        method: 'POST',
+                        body: uploadData
+                    }
+                );
+
+            const saveResult =
+                await readJson(
+                    saveResponse
+                );
+
+            if (
+                !saveResponse.ok ||
+                !saveResult.ok
+            ) {
+
+                throw new Error(
+                    saveResult.message ||
+                    'Gagal menyimpan data.'
+                );
+            }
+
+            /* Kirim email */
+
+            const emailData =
+                new FormData();
+
+            emailData.append(
+                'data',
+                JSON.stringify(data)
+            );
+
+            emailData.append(
+                'pdf',
+                new Blob(
+                    [pdfBytes],
+                    {
+                        type:
+                            'application/pdf'
+                    }
+                ),
+                'izin-kerja-' +
+                (data.permitNo ||
+                    'baru') +
+                '.pdf'
+            );
+
+            const emailResponse =
+                await fetch(
+                    API +
+                    '/api/send-email',
+                    {
+                        method: 'POST',
+                        body: emailData
+                    }
+                );
+
+            const emailResult =
+                await readJson(
+                    emailResponse
+                );
+
+            if (
+                !emailResponse.ok ||
+                !emailResult.ok
+            ) {
+
+                throw new Error(
+                    emailResult.message ||
+                    'Data tersimpan, tetapi email gagal dikirim.'
+                );
+            }
+
+            toast(
+                'Berhasil! Data tersimpan dan PDF telah dikirim ke email.',
+                'success'
+            );
+
+        } catch (error) {
+
+            console.error(
+                'KIRIM ERROR:',
+                error
+            );
+
+            toast(
+                error.message ||
+                'Terjadi kesalahan saat mengirim.',
+                'error'
+            );
+        }
+    }
+
+    async function readJson(response) {
+
+        const text =
+            await response.text();
+
+        try {
+
+            return JSON.parse(
+                text
+            );
+
+        } catch {
+
+            return {
+                ok: false,
+                message:
+                    text ||
+                    'Server memberikan respons yang tidak valid.'
+            };
+        }
+    }
+
+    /* =====================================================
+       PREVIEW
+       ===================================================== */
+
+    async function previewPDF() {
+
+        try {
+
+            toast(
+                'Membuat pratinjau PDF...',
+                'info'
+            );
+
+            const bytes =
+                await createPDF();
+
+            const blob =
+                new Blob(
+                    [bytes],
+                    {
+                        type:
+                            'application/pdf'
+                    }
+                );
+
+            const url =
+                URL.createObjectURL(
+                    blob
+                );
+
+            window.open(
+                url,
+                '_blank'
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            toast(
+                error.message ||
+                'Gagal membuat pratinjau PDF.',
+                'error'
+            );
+        }
+    }
+
+    /* =====================================================
+       ADMIN
+       ===================================================== */
+
+    function setupAdmin() {
+
+        const adminBtn =
+            $('#adminBtn');
+
+        const modal =
+            $('#adminModal');
+
+        if (!adminBtn || !modal) {
+            return;
+        }
+
+        adminBtn.addEventListener(
+            'click',
+            async () => {
+
+                modal.classList.remove(
+                    'hidden'
+                );
+
+                await checkAdmin();
+            }
+        );
+
+        $('#loginCancel')
+            ?.addEventListener(
+                'click',
+                () => {
+                    modal.classList.add(
+                        'hidden'
+                    );
+                }
+            );
+
+        $('#loginBtn')
+            ?.addEventListener(
+                'click',
+                loginAdmin
+            );
+
+        $('#logoutBtn')
+            ?.addEventListener(
+                'click',
+                logoutAdmin
+            );
+
+        $('#searchPermit')
+            ?.addEventListener(
+                'input',
+                loadAdminData
+            );
+
+        $('#statusFilter')
+            ?.addEventListener(
+                'change',
+                loadAdminData
+            );
+    }
+
+    async function checkAdmin() {
+
+        try {
+
+            const response =
+                await fetch(
+                    API +
+                    '/api/auth/me'
+                );
+
+            if (!response.ok) {
+
+                showLogin();
+
+                return;
+            }
+
+            const result =
+                await response.json();
+
+            if (result.ok) {
+
+                showDashboard();
+
+                loadAdminData();
+
+            } else {
+
+                showLogin();
+            }
+
+        } catch {
+
+            showLogin();
+        }
+    }
+
+    function showLogin() {
+
+        $('#loginBox')
+            ?.classList.remove(
+                'hidden'
+            );
+
+        $('#dashboardBox')
+            ?.classList.add(
+                'hidden'
+            );
+    }
+
+    function showDashboard() {
+
+        $('#loginBox')
+            ?.classList.add(
+                'hidden'
+            );
+
+        $('#dashboardBox')
+            ?.classList.remove(
+                'hidden'
+            );
+    }
+
+    async function loginAdmin() {
+
+        const username =
+            $('#adminUser')?.value ||
+            '';
+
+        const password =
+            $('#adminPass')?.value ||
+            '';
+
+        if (!username || !password) {
+
+            toast(
+                'Username dan password wajib diisi.',
+                'error'
+            );
+
+            return;
+        }
+
+        try {
+
+            const response =
+                await fetch(
+                    API +
+                    '/api/auth/login',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':
+                                'application/json'
+                        },
+                        credentials:
+                            'same-origin',
+                        body:
+                            JSON.stringify({
+                                username,
+                                password
+                            })
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            if (!response.ok ||
+                !result.ok) {
+
+                throw new Error(
+                    result.message ||
+                    'Login gagal.'
+                );
+            }
+
+            showDashboard();
+
+            loadAdminData();
+
+            toast(
+                'Login admin berhasil.',
+                'success'
+            );
+
+        } catch (error) {
+
+            toast(
+                error.message ||
+                'Login gagal.',
+                'error'
+            );
+        }
+    }
+
+    async function logoutAdmin() {
+
+        try {
+
+            await fetch(
+                API +
+                '/api/auth/logout',
+                {
+                    method: 'POST'
+                }
+            );
+
+            showLogin();
+
+            toast(
+                'Logout berhasil.',
+                'success'
+            );
+
+        } catch (error) {
+
+            console.error(error);
+        }
+    }
+
+    async function loadAdminData() {
+
+        const table =
+            $('#permitTable');
+
+        if (!table) {
+            return;
+        }
+
+        const q =
+            $('#searchPermit')?.value ||
+            '';
+
+        const status =
+            $('#statusFilter')?.value ||
+            '';
+
+        try {
+
+            const params =
+                new URLSearchParams();
+
+            if (q) {
+                params.set('q', q);
+            }
+
+            if (status) {
+                params.set(
+                    'status',
+                    status
+                );
+            }
+
+            const response =
+                await fetch(
+                    API +
+                    '/api/permits?' +
+                    params.toString()
+                );
+
+            if (
+                response.status === 401
+            ) {
+
+                showLogin();
+
+                return;
+            }
+
+            const result =
+                await response.json();
+
+            if (!result.ok) {
+
+                throw new Error(
+                    result.message ||
+                    'Gagal mengambil data.'
+                );
+            }
+
+            renderAdminTable(
+                result.rows || []
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            table.innerHTML =
+                '<p>Gagal memuat data.</p>';
+        }
+    }
+
+    function renderAdminTable(rows) {
+
+        const table =
+            $('#permitTable');
+
+        if (!table) {
+            return;
+        }
+
+        if (!rows.length) {
+
+            table.innerHTML =
+                '<p>Belum ada data.</p>';
+
+            return;
+        }
+
+        table.innerHTML = `
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Permit</th>
+                            <th>Pemohon</th>
+                            <th>Wilayah</th>
+                            <th>Lokasi</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(row => `
+                            <tr>
+                                <td>${escapeHtml(row.permitNo)}</td>
+                                <td>${escapeHtml(row.applicantName)}</td>
+                                <td>${escapeHtml(row.region)}</td>
+                                <td>${escapeHtml(row.location)}</td>
+                                <td>
+                                    <select
+                                        data-status-id="${escapeHtml(row.id)}"
+                                    >
+                                        ${[
+                                            'DRAFT',
+                                            'DIAJUKAN',
+                                            'DISETUJUI',
+                                            'DITOLAK',
+                                            'SELESAI'
+                                        ].map(status => `
+                                            <option
+                                                value="${status}"
+                                                ${row.status === status ? 'selected' : ''}
+                                            >
+                                                ${status}
+                                            </option>
+                                        `).join('')}
+                                    </select>
+                                </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        data-pdf-id="${escapeHtml(row.id)}"
+                                    >
+                                        PDF
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        table
+            .querySelectorAll(
+                '[data-status-id]'
+            )
+            .forEach(select => {
+
+                select.addEventListener(
+                    'change',
+                    async () => {
+
+                        await updateStatus(
+                            select.dataset.statusId,
+                            select.value
+                        );
+                    }
+                );
+            });
+
+        table
+            .querySelectorAll(
+                '[data-pdf-id]'
+            )
+            .forEach(button => {
+
+                button.addEventListener(
+                    'click',
+                    () => {
+
+                        window.open(
+                            '/api/permits/' +
+                            button.dataset.pdfId +
+                            '/pdf',
+                            '_blank'
+                        );
+                    }
+                );
+            });
+    }
+
+    async function updateStatus(
+        id,
+        status
+    ) {
+
+        try {
+
+            const response =
+                await fetch(
+                    '/api/permits/' +
+                    encodeURIComponent(id) +
+                    '/status',
+                    {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type':
+                                'application/json'
+                        },
+                        credentials:
+                            'same-origin',
+                        body:
+                            JSON.stringify({
+                                status
+                            })
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            if (
+                !response.ok ||
+                !result.ok
+            ) {
+
+                throw new Error(
+                    result.message ||
+                    'Gagal mengubah status.'
+                );
+            }
+
+            toast(
+                'Status berhasil diubah.',
+                'success'
+            );
+
+        } catch (error) {
+
+            toast(
+                error.message ||
+                'Gagal mengubah status.',
+                'error'
+            );
+
+            loadAdminData();
+        }
+    }
+
+    /* =====================================================
+       EVENT UTAMA
+       ===================================================== */
+
+    function setupEvents() {
+
+        $('#permitForm')
+            ?.addEventListener(
+                'submit',
+                event => {
+
+                    event.preventDefault();
+
+                    submitPermit();
+                }
+            );
+
+        $('#sendBtn')
+            ?.addEventListener(
+                'click',
+                event => {
+
+                    event.preventDefault();
+
+                    submitPermit();
+                }
+            );
+
+        $('#saveBtn')
+            ?.addEventListener(
+                'click',
+                event => {
+
+                    event.preventDefault();
+
+                    savePDF();
+                }
+            );
+
+        $('#previewBtn')
+            ?.addEventListener(
+                'click',
+                event => {
+
+                    event.preventDefault();
+
+                    previewPDF();
+                }
+            );
+
+        $('#topBtn')
+            ?.addEventListener(
+                'click',
+                () => {
+
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                }
+            );
+    }
+
+    /* =====================================================
+       INIT
+       ===================================================== */
+
+    async function init() {
+
+        console.log(
+            'APP.JS berhasil dimuat.'
+        );
+
+        renderCheckboxes(
+            'hazards',
+            HAZARDS,
+            'hazards'
+        );
+
+        renderCheckboxes(
+            'precautions',
+            PRECAUTIONS,
+            'precautions'
+        );
+
+        renderCheckboxes(
+            'ppe',
+            PPE,
+            'ppe'
+        );
+
+        renderApprovals();
+
+        renderCompletion();
+
+        setupSignature();
+
+        setupAdmin();
+
+        setupEvents();
+
+        await loadPermitNumber();
+
+        console.log(
+            'Form Izin Kerja siap digunakan.'
+        );
+    }
+
+    /* Jalankan setelah HTML siap */
+
+    if (
+        document.readyState ===
+        'loading'
+    ) {
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            init
+        );
+
+    } else {
+
+        init();
+    }
 
 })();
