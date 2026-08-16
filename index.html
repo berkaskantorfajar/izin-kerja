@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#182052">
+  <title>IZIN KERJA</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar"><div class="brand">
+  <div><div class="eyebrow">FORM DIGITAL</div><h1>IZIN KERJA</h1></div></div>
+  <div class="top-actions"><button id="adminBtn" class="icon-btn">Admin</button><button id="previewBtn" class="icon-btn" title="Pratinjau PDF">PDF</button></div>
+</header>
+<main class="app-shell">
+  <div class="notice"><b>Template baku.</b> Tampilan PDF menggunakan dokumen asli sebagai template sehingga layout, garis, teks, dan logo tidak digambar ulang.</div>
+  <form id="permitForm" autocomplete="off">
+    <section class="card"><h2>Identitas Dokumen</h2><div class="grid two">
+      <label>Kode Dokumen<input name="docCode"></label><label>Level Dokumen<input name="docLevel"></label>
+      <label>Revisi Ke<input name="revision"></label><label>Tgl. Mulai Berlaku<input name="effectiveStart" type="date"></label>
+      <label>Tanggal Berlaku<input name="effectiveDate" type="date"></label><label>Permit No<input name="permitNo"></label>
+    </div></section>
+
+    <section class="card"><h2>A. APLIKASI</h2><div class="chips">
+      <label class="check"><input type="checkbox" name="workTypes" value="Kerja Panas"><span>Kerja Panas</span></label>
+      <label class="check"><input type="checkbox" name="workTypes" value="Ruang Terbatas"><span>Ruang Terbatas</span></label>
+      <label class="check"><input type="checkbox" name="workTypes" value="Lain-lain"><span>Lain-lain</span></label>
+    </div><div class="grid two">
+      <label>Wilayah<input name="region"></label><label>Pemohon / Nama<input name="applicantName"></label>
+      <label>Lokasi<input name="location"></label><label>Tanda tangan pemohon<button type="button" class="signature-open" data-target="applicantSignature">Buka kolom tanda tangan</button><input type="hidden" name="applicantSignature" id="applicantSignature"></label>
+    </div></section>
+
+    <section class="card"><h2>B. DESKRIPSI KERJA</h2><label>Deskripsi pekerjaan<textarea name="jobDescription" rows="4"></textarea></label><div class="field-title">Jenis Peralatan</div><div class="chips">
+      <label class="check"><input type="checkbox" name="equipment" value="Mesin"><span>Mesin</span></label>
+      <label class="check"><input type="checkbox" name="equipment" value="Listrik"><span>Listrik</span></label>
+      <label class="check"><input type="checkbox" name="equipment" value="Peralatan Tangan"><span>Peralatan Tangan</span></label>
+    </div></section>
+
+    <section class="card"><h2>C. BAHAYA YANG MUNGKIN TERJADI</h2><div id="hazards" class="check-grid"></div></section>
+    <section class="card"><h2>D. TINDAKAN PENCEGAHAN</h2><div id="precautions" class="check-grid two-col"></div><label>Tindakan Keselamatan Lain yang diperlukan<textarea name="otherSafety" rows="3"></textarea></label></section>
+    <section class="card"><h2>E. ALAT PELINDUNG DIRI</h2><div id="ppe" class="check-grid two-col"></div></section>
+
+    <section class="card"><h2>F. PENGELUARAN SURAT IZIN</h2><label>Izin diberikan untuk kerja dijalankan yang tertera diatas selama<textarea name="permissionNote" rows="2"></textarea></label><div class="grid two"><label>Dari - Tanggal<input name="fromDate" type="date"></label><label>Dari - Jam<input name="fromTime" type="time"></label><label>Pemberi Izin<input name="issuerName"></label><label>Sampai Dengan - Tanggal<input name="toDate" type="date"></label><label>Sampai Dengan - Jam<input name="toTime" type="time"></label><label>Pengawas Pekerjaan<input name="supervisorName"></label></div></section>
+
+    <section class="card"><h2>G. PERSETUJUAN PENGGANTIAN PELAKSANA PEKERJAAN</h2><p class="small">Saya menyatakan bahwa Saya telah membaca &amp; memahami Keselamatan dan Kesehatan kerja &amp; pekerjaan ini akan dilaksanakan sesuai dengan segala persyaratan yang ada.</p><div class="approval-grid" id="approvals"></div></section>
+
+    <section class="card"><h2>H. PEMBATALAN</h2><div class="grid two"><label>Alasan<textarea name="cancelReason" rows="6"></textarea></label><label>Pernyataan dapat dimulai kembali<textarea name="resumeStatement" rows="6"></textarea></label></div><div class="grid four"><label>Tanggal<input name="cancelDate1" type="date"></label><label>Waktu<input name="cancelTime1" type="time"></label><label>Nama<input name="cancelName1"></label><label>Tanda tangan<button type="button" class="signature-open" data-target="cancelSignature1">Buka kolom tanda tangan</button><input type="hidden" name="cancelSignature1" id="cancelSignature1"></label><label>Tanggal<input name="cancelDate2" type="date"></label><label>Waktu<input name="cancelTime2" type="time"></label><label>Nama<input name="cancelName2"></label><label>Tanda tangan<button type="button" class="signature-open" data-target="cancelSignature2">Buka kolom tanda tangan</button><input type="hidden" name="cancelSignature2" id="cancelSignature2"></label></div>
+      <div class="field-title">Penyelesaian Izin Kerja</div><div id="completion" class="completion"></div>
+      <div class="grid two"><label>Penanggung Jawab / Pemberi izin<input name="finalResponsible"></label><label>Nama<input name="finalName"></label><label>Instansi<input name="finalInstitution"></label><label>Tanggal<input name="finalDate" type="date"></label><label>Jam<input name="finalTime" type="time"></label><label>Tanda tangan<button type="button" class="signature-open" data-target="finalSignature">Buka kolom tanda tangan</button><input type="hidden" name="finalSignature" id="finalSignature"></label></div>
+      <div class="note"><b>Note:</b><br>Pengisian "Alasan " untuk poin H. Pembatalan:<br>a. Keadaan darurat;<br>b. Untuk alasan keselamatan operasional perkeretaapian;<br>c. Pekerjaan yang dilakukan hanya dalam satu shift; dan<br>d. Pekerjaan ditangguhkan atau ditunda selama sembilan puluh (90) menit atau lebih</div>
+    </section>
+  </form>
+</main>
+<nav class="bottom-nav"><button id="topBtn">↑<small>Atas</small></button><button id="saveBtn">Simpan PDF<small>Unduh</small></button><button id="sendBtn" class="primary">Kirim<small>Email</small></button></nav>
+<div id="sigModal" class="modal hidden"><div class="modal-card"><h3>Tanda Tangan</h3><canvas id="sigCanvas" width="700" height="260"></canvas><div class="modal-actions"><button id="sigClear">Hapus</button><button id="sigCancel">Batal</button><button id="sigUse" class="primary">Gunakan</button></div></div></div>
+<div id="toast" class="toast"></div>
+<div id="adminModal" class="modal hidden"><div class="modal-card"><h3>Login Admin</h3><div id="loginBox"><label>Username<input id="adminUser" autocomplete="username"></label><label>Password<input id="adminPass" type="password" autocomplete="current-password"></label><div class="modal-actions"><button id="loginCancel">Batal</button><button id="loginBtn" class="primary">Masuk</button></div></div><div id="dashboardBox" class="hidden"><div class="admin-tools"><input id="searchPermit" placeholder="Cari permit, pemohon, wilayah, lokasi..."><select id="statusFilter"><option value="">Semua status</option><option>DRAFT</option><option>DIAJUKAN</option><option>DISETUJUI</option><option>DITOLAK</option><option>SELESAI</option></select><button id="logoutBtn">Keluar</button></div><div id="permitTable"></div></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="/assets/app.js"></script>
+</body></html>
